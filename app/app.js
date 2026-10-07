@@ -20,12 +20,33 @@ function defaultState() {
     progress: {},          // w -> {ef, ivl, reps, due(ts)}
     daily: { date: today(), newDone: 0, revDone: 0 },
     streak: { last: '', count: 0 },
+    spell: {},             // w -> {ok, bad, weak} 拼写记录, weak=最近一次没拼对
   };
 }
-function today() {
-  const d = new Date();
+function dateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
+function today() { return dateStr(new Date()); }
+function yesterday() { const d = new Date(); d.setDate(d.getDate() - 1); return dateStr(d); }
+// 本地零点 + n 天(按日历日计, 跨夏令时也准确)
+function dayStart(offsetDays) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + (offsetDays || 0));
+  return d.getTime();
+}
+// 连续天数: 最后一次学习既不是今天也不是昨天 -> 已中断, 显示0
+function currentStreak() {
+  const last = state.streak.last;
+  return (last === today() || last === yesterday()) ? state.streak.count : 0;
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, ch =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+}
+// 真题例句常带选项前缀 "D) " / "[B] ", 去掉
+function cleanExample(s) { return String(s || '').replace(/^\s*[\[(]?[A-Da-d][\])]\s*/, '').trim(); }
+function isMastered(p) { return p.reps >= 3 && p.ivl >= 21; }
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
@@ -37,6 +58,7 @@ function loadState() {
         progress: s.progress || {},
         daily: s.daily || def.daily,
         streak: s.streak || def.streak,
+        spell: s.spell || {},
       };
     }
   } catch (e) { /* 损坏则重建 */ }
@@ -68,10 +90,12 @@ function eligibleNewWords() {
   });
 }
 function dueReviews(now) {
+  // 今天之内到期的都算(兼容旧版按"答题时刻+N×24h"存的到期时间)
+  const cutoff = Math.max(now, dayStart(1) - 1);
   const list = [];
   for (const w in state.progress) {
     const p = state.progress[w];
-    if (p.due <= now && WORD_MAP[w]) list.push({ word: WORD_MAP[w], isNew: false });
+    if (p.due <= cutoff && WORD_MAP[w]) list.push({ word: WORD_MAP[w], isNew: false });
   }
   list.sort((a, b) => (b.word.imp - a.word.imp) || (b.word.kyF - a.word.kyF)); // 重点词优先复习
   return list;
@@ -94,7 +118,8 @@ function schedule(word, q) {
     }
     reps += 1;
   }
-  const due = ivl === 0 ? Date.now() : Date.now() + ivl * 86400000;
+  // 按日历日到期: 晚上学的词第二天一早就能复习, 而不是要等到第二天同一时刻
+  const due = ivl === 0 ? Date.now() : dayStart(ivl);
   state.progress[word.w] = { ef: Math.round(ef * 100) / 100, ivl, reps, due };
   saveState();
   return ivl === 0; // 返回是否需要当场重现
@@ -128,23 +153,44 @@ function renderHome() {
   const reviews = dueReviews(now);
   const dailyLeft = Math.max(0, state.settings.daily - state.daily.newDone);
   const news = eligibleNewWords().slice(0, dailyLeft);
+  const d = new Date();
   document.getElementById('home-date').textContent =
-    new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+    d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+  const h = d.getHours();
+  document.getElementById('home-greeting').textContent =
+    h < 5 ? '夜深了，早些休息' : h < 11 ? '早安，开始今日精进' : h < 14 ? '午间，温故而知新'
+      : h < 18 ? '下午好，稳步积累' : '晚上好，今日事今日毕';
   document.getElementById('home-new').textContent = news.length;
   document.getElementById('home-review').textContent = reviews.length;
+  const done = state.daily.newDone + state.daily.revDone;
   document.getElementById('home-done').textContent =
-    '已完成 新词 ' + state.daily.newDone + ' · 复习 ' + state.daily.revDone;
+    '今日已完成 新词 ' + state.daily.newDone + ' · 复习 ' + state.daily.revDone;
   const startBtn = document.getElementById('btn-start');
   const total = news.length + reviews.length;
   startBtn.disabled = total === 0;
-  startBtn.textContent = total === 0 ? '今日已完成' : '开始学习';
-  const scopeTxt = state.settings.scope === 'key' ? '重点词优先' : '全部词汇';
+  startBtn.textContent = total === 0 ? '今日已完成' : (done > 0 ? '继续学习' : '开始学习');
+
+  // 今日进度环
+  const pct = total + done === 0 ? 0 : Math.round(done / (done + total) * 100);
+  document.getElementById('home-pct').textContent = (total === 0 && done === 0 ? 100 : pct) + '%';
+  const C = 2 * Math.PI * 52;
+  const ring = document.getElementById('home-ring');
+  ring.style.strokeDashoffset = String(C * (1 - (total === 0 ? 1 : pct / 100)));
+  ring.style.opacity = (total > 0 && pct === 0) ? '0' : '1'; // 0%时圆头线帽会留一个点
+
+  const scopeTxt = state.settings.scope === 'key' ? '仅重点词' : '全部词汇';
   document.getElementById('home-range').textContent =
-    '范围: ' + scopeTxt + (state.settings.basic ? ' · 含基础词' : '') + ' · 每日新词 ' + state.settings.daily;
-  const learned = Object.keys(state.progress).length;
-  const mastered = Object.values(state.progress).filter(p => p.reps >= 3 && p.ivl >= 21).length;
-  document.getElementById('home-overall').textContent =
-    '已学 ' + learned + ' 词 · 已掌握 ' + mastered + ' 词 · 连续 ' + state.streak.count + ' 天';
+    scopeTxt + (state.settings.basic ? ' · 含基础词' : '') + ' · 每日新词 ' + state.settings.daily;
+  const ps = Object.values(state.progress);
+  const learned = ps.length;
+  document.getElementById('home-learned').textContent = learned;
+  document.getElementById('home-mastered').textContent = ps.filter(isMastered).length;
+  document.getElementById('home-streak').textContent = currentStreak();
+  document.getElementById('home-overall').textContent = learned + ' / ' + WORDS.length;
+  const weak = weakSpellWords().length;
+  document.getElementById('home-spell-info').textContent =
+    learned === 0 ? '· 学过的词才能练' : weak ? '· ' + weak + ' 词待巩固' : '· ' + learned + ' 词可练';
+  document.getElementById('home-vp').style.width = (learned / WORDS.length * 100).toFixed(2) + '%';
 }
 
 /* ================= 发音 (美音) ================= */
@@ -283,17 +329,17 @@ function showCard() {
   document.getElementById('word-text2').textContent = word.w;
   document.getElementById('word-ph2').textContent = word.ph ? '/' + word.ph + '/' : '';
   document.getElementById('word-def').textContent = word.t || '';
-  document.getElementById('word-root').textContent = word.r || '（暂无拆解）';
+  document.getElementById('word-root').textContent = (word.r || '（暂无拆解）').replace(/\s*->\s*/g, ' → ');
   const exampleEl = document.getElementById('word-example');
   const exampleZhEl = document.getElementById('word-example-zh');
   if (word.c && word.c.length === 2) {
     exampleEl.textContent = word.c[0];
     exampleZhEl.textContent = word.c[1];
     curExampleEn = word.c[0];
-  } else if (word.ex) {
-    exampleEl.textContent = word.ex + '（六级真题）';
-    exampleZhEl.textContent = '';
-    curExampleEn = word.ex;
+  } else if (cleanExample(word.ex)) {
+    curExampleEn = cleanExample(word.ex);
+    exampleEl.textContent = curExampleEn;
+    exampleZhEl.textContent = '—— 六级真题';
   } else {
     exampleEl.textContent = '（暂无例句）';
     exampleZhEl.textContent = '';
@@ -326,27 +372,186 @@ document.getElementById('btn-fuzzy').addEventListener('click', () => answer(3));
 document.getElementById('btn-know').addEventListener('click', () => answer(4));
 
 function answer(q) {
-  const { word, isNew } = studyQueue[studyIndex];
+  // 只在背面(答题栏可见)时接受作答, 防止快捷键/连点越界
+  if (!studyQueue[studyIndex] || !document.getElementById('answer-bar').classList.contains('show')) return;
+  const { word, isNew, again } = studyQueue[studyIndex];
+  rollDaily(); // 学习跨过零点时, 计数记到新的一天
   const requeue = schedule(word, q);
   // 连续天数
   const t = today();
   if (state.streak.last !== t) {
-    const yest = new Date(Date.now() - 86400000);
-    const ys = yest.getFullYear() + '-' + String(yest.getMonth() + 1).padStart(2, '0') + '-' + String(yest.getDate()).padStart(2, '0');
-    state.streak.count = state.streak.last === ys ? state.streak.count + 1 : 1;
+    state.streak.count = state.streak.last === yesterday() ? state.streak.count + 1 : 1;
     state.streak.last = t;
   }
-  if (isNew) state.daily.newDone += 1; else state.daily.revDone += 1;
+  // 当场重现的卡不重复计数, 否则"忘了"的新词会把复习数虚高
+  if (!again) { if (isNew) state.daily.newDone += 1; else state.daily.revDone += 1; }
   saveState();
   studyIndex += 1;
-  if (requeue) studyQueue.push({ word, isNew: false }); // 忘了: 当场重现
+  if (requeue) studyQueue.push({ word, isNew: false, again: true }); // 忘了: 当场重现
   showCard();
 }
 
 function finishStudy() {
+  const n = studyIndex;
   studyQueue = [];
   nav('home');
-  toast('今日任务完成 🎉');
+  toast('本轮完成 ' + n + ' 张卡片，做得好');
+}
+
+// 键盘快捷键: 空格/回车 翻面, 1/2/3 作答, P 发音, Esc 退出
+if (typeof document.addEventListener === 'function') {
+  document.addEventListener('keydown', ev => {
+    if (!document.getElementById('scr-study').classList.contains('active')) return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) return;
+    const k = ev.key;
+    const onFront = document.getElementById('reveal-bar').classList.contains('show');
+    if ((k === ' ' || k === 'Enter') && onFront) { ev.preventDefault(); reveal(); }
+    else if (k === '1') answer(2);
+    else if (k === '2') answer(3);
+    else if (k === '3') answer(4);
+    else if (k === 'p' || k === 'P') speakWord();
+    else if (k === 'Escape') document.getElementById('btn-exit').click();
+  });
+  // 页面长时间挂着跨过零点, 回到前台时刷新首页计数
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && document.getElementById('scr-home').classList.contains('active')) renderHome();
+  });
+}
+
+/* ================= 拼写练习 ================= */
+// 从已学词中出题: 上次拼错/用了提示的词优先, 其余随机; 看释义+听发音写单词
+const SPELL_SIZE = 20;
+let spellQueue = [];
+let spellIndex = 0;
+let spellChecked = false;   // 当前题是否已判定(等待"下一个")
+let spellHints = 0;         // 当前题已揭示的字母数
+
+function weakSpellWords() {
+  return Object.keys(state.spell).filter(w => state.spell[w].weak && state.progress[w] && WORD_MAP[w]);
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function startSpell() {
+  const learned = Object.keys(state.progress).filter(w => WORD_MAP[w]);
+  if (learned.length === 0) { toast('先去学习一些单词，再来练拼写'); return; }
+  const weak = shuffle(weakSpellWords());
+  const rest = shuffle(learned.filter(w => weak.indexOf(w) < 0));
+  spellQueue = weak.concat(rest).slice(0, SPELL_SIZE).map(w => ({ word: WORD_MAP[w], again: false }));
+  spellIndex = 0;
+  nav('spell');
+  showSpell();
+}
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+// 例句挖空: 单词及其变形(adopt -> adopting)替换成下划线
+function clozeSentence(word) {
+  let en = '', zh = '';
+  if (word.c && word.c.length === 2) { en = word.c[0]; zh = word.c[1]; } else { en = cleanExample(word.ex); }
+  if (!en || word.w.length < 3) return null;
+  const re = new RegExp('\\b' + escapeRe(word.w) + '[a-z]*', 'gi');
+  if (!re.test(en)) return null;
+  return { en: escapeHtml(en).replace(re, '<u></u>'), zh: escapeHtml(zh) };
+}
+function renderMask() {
+  const w = spellQueue[spellIndex].word.w;
+  document.getElementById('sp-mask').innerHTML = w.split('').map((ch, i) =>
+    i < spellHints ? '<b>' + escapeHtml(ch) + '</b>' : (/[a-z]/i.test(ch) ? '_' : escapeHtml(ch))).join('');
+}
+function showSpell() {
+  if (spellIndex >= spellQueue.length) { finishSpell(); return; }
+  const { word } = spellQueue[spellIndex];
+  spellChecked = false;
+  spellHints = 0;
+  document.getElementById('spell-progress').textContent = (spellIndex + 1) + ' / ' + spellQueue.length;
+  document.getElementById('spell-bar').style.width = (spellIndex / spellQueue.length * 100) + '%';
+  document.getElementById('sp-def').textContent = word.t || '';
+  document.getElementById('sp-ph').textContent = word.ph ? '/' + word.ph + '/' : '';
+  const cz = clozeSentence(word);
+  document.getElementById('sp-cloze').innerHTML = cz
+    ? '<div class="en">' + cz.en + '</div>' + (cz.zh ? '<div class="zh">' + cz.zh + '</div>' : '') : '';
+  renderMask();
+  document.getElementById('sp-len').textContent = word.w.length + ' 个字母';
+  const input = document.getElementById('sp-input');
+  input.value = '';
+  input.className = 'sp-input';
+  input.readOnly = false;
+  document.getElementById('sp-feedback').innerHTML = '';
+  document.getElementById('spell-check-text').textContent = '确认';
+  document.getElementById('btn-spell-hint').disabled = false;
+  if (input.focus) input.focus();
+  if (state.settings.autoSpeak) speak(word.w);
+}
+function spellHint() {
+  if (spellChecked || !spellQueue[spellIndex]) return;
+  const w = spellQueue[spellIndex].word.w;
+  if (spellHints < w.length - 1) spellHints += 1;
+  renderMask();
+  const input = document.getElementById('sp-input');
+  // 输入框里补上已揭示的前缀, 方便接着往下拼
+  if (input.value.toLowerCase().indexOf(w.slice(0, spellHints).toLowerCase()) !== 0) input.value = w.slice(0, spellHints);
+  if (input.focus) input.focus();
+}
+function checkSpell() {
+  if (!spellQueue[spellIndex]) return;
+  if (spellChecked) { spellIndex += 1; showSpell(); return; }
+  const item = spellQueue[spellIndex];
+  const target = item.word.w;
+  const input = document.getElementById('sp-input');
+  const val = input.value.trim();
+  if (!val) { if (input.focus) input.focus(); return; }
+  const correct = val.toLowerCase() === target.toLowerCase();
+  spellChecked = true;
+  input.readOnly = true;
+  input.className = 'sp-input ' + (correct ? 'ok' : 'bad');
+  const rec = state.spell[target] || { ok: 0, bad: 0, weak: false };
+  if (correct) rec.ok += 1; else rec.bad += 1;
+  // 用了提示也算没完全掌握, 留在待巩固里
+  rec.weak = !correct || spellHints > 0;
+  state.spell[target] = rec;
+  saveState();
+  const fb = document.getElementById('sp-feedback');
+  if (correct) {
+    fb.innerHTML = '<div class="verdict ok">' + (spellHints ? '正确（用了提示）' : '正确') + '</div>';
+  } else {
+    // 逐位比对, 标出拼错的字母
+    const a = val.toLowerCase();
+    const marked = target.split('').map((ch, i) =>
+      a[i] === ch.toLowerCase() ? escapeHtml(ch) : '<span class="x">' + escapeHtml(ch) + '</span>').join('');
+    fb.innerHTML = '<div class="verdict bad">拼写错误</div><div class="sp-answer">' + marked + '</div>';
+    if (!item.again) spellQueue.push({ word: item.word, again: true }); // 本轮末尾再考一次
+  }
+  // 判定后隐藏字母遮罩, 答案只在反馈区显示一次
+  document.getElementById('sp-mask').textContent = '';
+  document.getElementById('sp-len').textContent = '';
+  document.getElementById('spell-check-text').textContent = '下一个';
+  document.getElementById('btn-spell-hint').disabled = true;
+  speak(target);
+}
+function finishSpell() {
+  const n = spellQueue.filter(x => !x.again).length;
+  spellQueue = [];
+  nav('home');
+  toast('拼写练习完成 ' + n + ' 词');
+}
+document.getElementById('btn-spell').addEventListener('click', startSpell);
+document.getElementById('btn-spell-exit').addEventListener('click', () => { spellQueue = []; nav('home'); });
+document.getElementById('btn-spell-check').addEventListener('click', checkSpell);
+document.getElementById('btn-spell-hint').addEventListener('click', spellHint);
+document.getElementById('btn-spell-speak').addEventListener('click', () => {
+  if (spellQueue[spellIndex]) speak(spellQueue[spellIndex].word.w);
+});
+document.getElementById('sp-input').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') { ev.preventDefault(); checkSpell(); }
+  else if (ev.key === 'ArrowUp') { ev.preventDefault(); if (spellQueue[spellIndex]) speak(spellQueue[spellIndex].word.w); }
+});
+if (typeof document.addEventListener === 'function') {
+  // Esc 退出; 焦点不在输入框时回车也能确认/下一个
+  document.addEventListener('keydown', ev => {
+    if (!document.getElementById('scr-spell').classList.contains('active')) return;
+    if (ev.key === 'Escape') document.getElementById('btn-spell-exit').click();
+    else if (ev.key === 'Enter' && ev.target !== document.getElementById('sp-input')) { ev.preventDefault(); checkSpell(); }
+  });
 }
 
 /* ================= 设置页 ================= */
@@ -383,10 +588,13 @@ document.getElementById('btn-voice-test').addEventListener('click', () => {
 document.getElementById('btn-export').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = 'vocab-progress-' + today() + '.json';
+  // 链接须在文档内且不能立刻revoke, 否则Firefox/Safari下载会失败
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => { URL.revokeObjectURL(url); if (a.remove) a.remove(); }, 1000);
   toast('已导出学习记录');
 });
 document.getElementById('btn-import').addEventListener('click', () => {
@@ -399,7 +607,7 @@ document.getElementById('import-file').addEventListener('change', ev => {
   reader.onload = () => {
     try {
       const s = JSON.parse(reader.result);
-      if (!s.progress || !s.settings) throw new Error('bad');
+      if (!s || typeof s.progress !== 'object' || typeof s.settings !== 'object') throw new Error('bad');
       localStorage.setItem(STORE_KEY, JSON.stringify(s));
       location.reload();
     } catch (e) { toast('文件格式不正确'); }
@@ -418,38 +626,51 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 function renderStats() {
   const ps = Object.values(state.progress);
   const learned = ps.length;
-  const mastered = ps.filter(p => p.reps >= 3 && p.ivl >= 21).length;
+  const mastered = ps.filter(isMastered).length;
   document.getElementById('st-learned').textContent = learned;
   document.getElementById('st-reviewing').textContent = learned - mastered;
   document.getElementById('st-mastered').textContent = mastered;
-  document.getElementById('st-streak').textContent = state.streak.count;
+  document.getElementById('st-streak').textContent = currentStreak();
   document.getElementById('st-total').textContent = WORDS.length;
   document.getElementById('st-today').textContent = state.daily.newDone + state.daily.revDone;
+  const sp = Object.values(state.spell);
+  const spOk = sp.reduce((n, r) => n + r.ok, 0), spAll = sp.reduce((n, r) => n + r.ok + r.bad, 0);
+  document.getElementById('st-spell-total').textContent = spAll;
+  document.getElementById('st-spell-rate').textContent = spAll ? Math.round(spOk / spAll * 100) + '%' : '—';
+  document.getElementById('st-spell-weak').textContent = weakSpellWords().length;
 
-  // 词库构成
-  const c = { 3: 0, 2: 0, 1: 0, 0: 0 };
-  WORDS.forEach(w => { c[w.imp] += 1; });
-  document.getElementById('st-breakdown').innerHTML =
-    '词库构成<br>双重点 ' + c[3] + ' 词（考研+六级真题双高频）<br>' +
-    '考研重点 ' + c[2] + ' 词（考研真题高频）<br>' +
-    '六级重点 ' + c[1] + ' 词（六级真题高频）<br>' +
-    '普通词 ' + c[0] + ' 词';
+  // 词库构成: 各等级词数 + 已学占比
+  const c = { 3: 0, 2: 0, 1: 0, 0: 0 }, l = { 3: 0, 2: 0, 1: 0, 0: 0 };
+  WORDS.forEach(w => { c[w.imp] += 1; if (state.progress[w.w]) l[w.imp] += 1; });
+  const desc = { 3: '考研 + 六级真题双高频', 2: '考研真题高频', 1: '六级真题高频', 0: '大纲其余词汇' };
+  document.getElementById('st-breakdown').innerHTML = [3, 2, 1, 0].map(k =>
+    '<div class="bd-row tag-' + k + '"><div class="bd-head"><span>' + TAG_NAMES[k] +
+    '<span class="bd-desc">' + desc[k] + '</span></span><span class="bd-num">' + l[k] + ' / ' + c[k] + '</span></div>' +
+    '<div class="bd-bar"><i style="width:' + (c[k] ? (l[k] / c[k] * 100).toFixed(1) : 0) + '%"></i></div></div>'
+  ).join('');
 }
 
-/* 查词 */
+/* 查词: 英文按 完全匹配 > 前缀 > 包含 排序; 含中文时按释义搜 */
 const searchInput = document.getElementById('search-input');
 searchInput.addEventListener('input', () => {
   const q = searchInput.value.trim().toLowerCase();
   const box = document.getElementById('search-result');
   if (!q) { box.innerHTML = ''; return; }
-  const hits = WORDS.filter(w => w.w.startsWith(q) || w.w.includes(q)).slice(0, 8);
-  box.innerHTML = hits.map(w =>
-    '<div class="sr-item"><div class="sr-word">' + w.w +
-    (w.ph ? ' <span class="sr-ph">/' + w.ph + '/</span>' : '') +
-    ' <span class="tag tag-' + w.imp + '" style="font-size:10px">' + TAG_NAMES[w.imp] + '</span></div>' +
-    '<div class="sr-def">' + (w.t || '') + '</div>' +
-    '<div class="sr-root">' + (w.r || '') + '</div></div>'
-  ).join('') || '<div class="sr-item sr-def">未找到</div>';
+  let hits;
+  if (/[一-鿿]/.test(q)) {
+    hits = STUDY_ORDER.filter(w => (w.t || '').includes(q));
+  } else {
+    const rank = w => w.w === q ? 0 : w.w.startsWith(q) ? 1 : w.w.includes(q) ? 2 : -1;
+    hits = WORDS.filter(w => rank(w) >= 0)
+      .sort((a, b) => (rank(a) - rank(b)) || (a.w.length - b.w.length) || (a.w < b.w ? -1 : 1));
+  }
+  box.innerHTML = hits.slice(0, 10).map(w =>
+    '<div class="sr-item"><div class="sr-word">' + escapeHtml(w.w) +
+    (w.ph ? '<span class="sr-ph">/' + escapeHtml(w.ph) + '/</span>' : '') +
+    '<span class="tag tag-' + w.imp + '">' + TAG_NAMES[w.imp] + '</span></div>' +
+    '<div class="sr-def">' + escapeHtml(w.t) + '</div>' +
+    (w.r ? '<div class="sr-root">' + escapeHtml(w.r.replace(/\s*->\s*/g, ' → ')) + '</div>' : '') + '</div>'
+  ).join('') || '<div class="sr-empty">未找到相关单词</div>';
 });
 
 /* ================= 启动 ================= */

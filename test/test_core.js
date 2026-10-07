@@ -163,5 +163,61 @@ get('state.settings.basic=true');
 const elig2 = get('eligibleNewWords()');
 check('开启基础词后包含bs词', elig2.some(w => w.bs === 1));
 
+console.log('== 8. Bug 修复回归 ==');
+const wk = get(`(function(){const w=WORDS.find(x=>x.w==='abandon');state.progress[w.w]={ef:2.5,ivl:0,reps:0,due:0};schedule(w,4);return state.progress[w.w].due;})()`);
+check('到期时间按日历日对齐到零点', new Date(wk).getHours() === 0 && new Date(wk).getMinutes() === 0 && wk > Date.now());
+get('state.streak={last:"2000-01-01",count:9}');
+check('中断的连续天数显示为0', get('currentStreak()') === 0);
+get('state.streak={last:yesterday(),count:9}');
+check('昨天学过连续天数保留', get('currentStreak()') === 9);
+check('真题例句去掉选项前缀', get('cleanExample("D) The self-repairing ability")') === 'The self-repairing ability');
+check('HTML转义', get('escapeHtml("<b>&")') === '&lt;b&gt;&amp;');
+els['search-input'].value = 'act';
+els['search-input'].fire('input');
+check('查词完全匹配排第一', /^<div class="sr-item"><div class="sr-word">act</.test(els['search-result'].innerHTML));
+els['search-input'].value = '抛弃';
+els['search-input'].fire('input');
+check('支持中文释义查词', els['search-result'].innerHTML.includes('abandon'));
+// 忘了的新词当场重现后再答, 不应计入复习数
+get('state.progress={};state.daily={date:today(),newDone:0,revDone:0};state.settings.daily=1');
+get('startStudy()');
+els['btn-reveal'].click(); els['btn-forgot'].click();
+els['btn-reveal'].click(); els['btn-know'].click();
+check('当场重现不重复计数', get('state.daily.newDone') === 1 && get('state.daily.revDone') === 0,
+  get('JSON.stringify(state.daily)'));
+check('未翻面时快捷作答被忽略', (() => { get('answer(4)'); return get('state.daily.newDone') === 1; })());
+
+console.log('== 9. 拼写练习 ==');
+get('state.progress={};state.spell={}');
+get('startSpell()');
+check('无已学词时不开始拼写', get('spellQueue').length === 0);
+get(`['abandon','ability','adopt'].forEach(w=>{state.progress[w]={ef:2.5,ivl:1,reps:1,due:Date.now()+86400000};})`);
+get('state.spell={adopt:{ok:0,bad:1,weak:true}}');
+get('startSpell()');
+check('拼写队列 = 已学词', get('spellQueue').length === 3, 'len=' + get('spellQueue').length);
+check('待巩固词排在最前', get('spellQueue')[0].word.w === 'adopt');
+check('题面不泄露单词(遮罩)', els['sp-mask'].innerHTML === '_____');
+check('例句挖空不含原词', !/adopt/i.test(els['sp-cloze'].innerHTML) && els['sp-cloze'].innerHTML.includes('<u>'),
+  els['sp-cloze'].innerHTML.slice(0, 80));
+els['sp-input'].value = 'Adopt';
+els['btn-spell-check'].click();
+check('拼对(忽略大小写)记录正确', get('state.spell.adopt.ok') === 1 && get('state.spell.adopt.weak') === false);
+els['btn-spell-check'].click(); // 下一个
+const sw2 = get('spellQueue[spellIndex].word.w');
+els['sp-input'].value = 'xxxx';
+els['btn-spell-check'].click();
+check('拼错进入待巩固', get('state.spell["' + sw2 + '"].weak') === true);
+check('拼错的词本轮末尾再考一次', get('spellQueue').length === 4);
+check('拼错时标出错误字母', els['sp-feedback'].innerHTML.includes('class="x"'));
+els['btn-spell-check'].click();
+get('spellHint()'); get('spellHint()');
+const sw3 = get('spellQueue[spellIndex].word.w');
+check('提示揭示前两个字母', els['sp-input'].value === sw3.slice(0, 2));
+els['sp-input'].value = sw3;
+els['btn-spell-check'].click();
+check('用了提示仍算待巩固', get('state.spell["' + sw3 + '"].weak') === true);
+get('spellIndex=spellQueue.length-1;spellChecked=true;checkSpell()');
+check('练完返回首页', get('spellQueue').length === 0);
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

@@ -3,158 +3,257 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>背单词 · 考研×六级</title>
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)">
+<title>词境 · 考研 × 六级</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<!-- SVG 图标 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z M13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</svg>
+
 <!-- ============ 首页 ============ -->
 <div id="scr-home" class="screen">
   <header class="topbar">
-    <div class="brand">背单词</div>
+    <div class="brand">
+      <span class="brand-mark">词</span>
+      <span class="brand-text"><b>词境</b><small>考研 × 六级</small></span>
+    </div>
     <div class="topbar-actions">
-      <button class="icon-btn" data-nav="stats" title="统计">📊</button>
-      <button class="icon-btn" data-nav="settings" title="设置">⚙️</button>
+      <button class="icon-btn" data-nav="stats" title="统计" aria-label="统计"><svg><use href="#i-chart"/></svg></button>
+      <button class="icon-btn" data-nav="settings" title="设置" aria-label="设置"><svg><use href="#i-gear"/></svg></button>
     </div>
   </header>
 
   <main class="home-main">
-    <div class="date-line" id="home-date"></div>
-    <div class="today-card">
-      <div class="today-title">今日任务</div>
+    <div class="hero">
+      <div class="date-line" id="home-date"></div>
+      <h1 class="greeting" id="home-greeting">今日，继续精进</h1>
+    </div>
+
+    <section class="today-card">
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"/>
+          <circle class="ring-fill" id="home-ring" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="ring-center">
+          <div class="ring-pct" id="home-pct">0%</div>
+          <div class="ring-label">今日进度</div>
+        </div>
+      </div>
+
       <div class="today-nums">
         <div class="tn-item">
           <div class="tn-num" id="home-new">0</div>
-          <div class="tn-label">新词</div>
+          <div class="tn-label">待学新词</div>
         </div>
         <div class="tn-sep"></div>
         <div class="tn-item">
           <div class="tn-num" id="home-review">0</div>
-          <div class="tn-label">复习</div>
+          <div class="tn-label">待复习</div>
         </div>
       </div>
       <div class="today-done" id="home-done">已完成 0</div>
       <button class="start-btn" id="btn-start">开始学习</button>
-    </div>
+      <button class="spell-entry" id="btn-spell"><svg><use href="#i-pen"/></svg>拼写练习<small id="home-spell-info"></small></button>
+      <div class="range-info" id="home-range"></div>
+    </section>
 
-    <div class="range-info" id="home-range"></div>
-    <div class="overall-info" id="home-overall"></div>
+    <section class="overview">
+      <div class="ov-cell"><div class="ov-num" id="home-learned">0</div><div class="ov-label">已学</div></div>
+      <div class="ov-cell"><div class="ov-num" id="home-mastered">0</div><div class="ov-label">已掌握</div></div>
+      <div class="ov-cell"><div class="ov-num" id="home-streak">0</div><div class="ov-label">连续天数</div></div>
+    </section>
+    <div class="vocab-progress">
+      <div class="vp-head"><span>词库进度</span><span id="home-overall">0 / 0</span></div>
+      <div class="vp-bar"><div class="vp-fill" id="home-vp"></div></div>
+    </div>
   </main>
 </div>
 
 <!-- ============ 学习 ============ -->
 <div id="scr-study" class="screen">
   <header class="topbar">
-    <button class="icon-btn" id="btn-exit" title="退出">✕</button>
+    <button class="icon-btn" id="btn-exit" title="退出 (Esc)" aria-label="退出"><svg><use href="#i-close"/></svg></button>
     <div class="study-progress" id="study-progress">0 / 0</div>
-    <div class="study-countdown" id="study-type"></div>
+    <div class="study-type" id="study-type"></div>
   </header>
   <div class="progressbar"><div class="progressbar-fill" id="study-bar"></div></div>
 
   <main class="study-main" id="study-main">
-    <!-- 卡片正面 -->
-    <div class="card-front" id="card-front">
-      <div class="word-tags" id="word-tags"></div>
-      <div class="word-line">
+    <div class="paper">
+      <!-- 卡片正面 -->
+      <div class="card-front" id="card-front">
+        <div class="word-tags" id="word-tags"></div>
         <div class="word" id="word-text"></div>
-        <button class="speak-btn" id="btn-speak-front" title="发音">🔊</button>
+        <div class="phon-line">
+          <span class="phonetic" id="word-ph"></span>
+          <button class="speak-btn" id="btn-speak-front" title="发音" aria-label="发音"><svg><use href="#i-sound"/></svg></button>
+        </div>
+        <div class="freq-line" id="word-freq"></div>
+        <div class="tap-hint">轻触卡片 · 查看释义</div>
       </div>
-      <div class="phonetic" id="word-ph"></div>
-      <div class="freq-line" id="word-freq"></div>
-      <div class="tap-hint">点击查看释义</div>
-    </div>
-    <!-- 卡片背面 -->
-    <div class="card-back" id="card-back">
-      <div class="word-line">
-        <div class="word-small" id="word-text2"></div>
-        <button class="speak-btn" id="btn-speak-back" title="发音">🔊</button>
+      <!-- 卡片背面 -->
+      <div class="card-back" id="card-back">
+        <div class="back-head">
+          <div class="word-small" id="word-text2"></div>
+          <div class="phon-line">
+            <span class="phonetic" id="word-ph2"></span>
+            <button class="speak-btn" id="btn-speak-back" title="发音" aria-label="发音"><svg><use href="#i-sound"/></svg></button>
+          </div>
+        </div>
+        <div class="def" id="word-def"></div>
+        <div class="block">
+          <div class="section-label">词根词缀</div>
+          <div class="root-line" id="word-root"></div>
+        </div>
+        <div class="block">
+          <div class="section-label">情景例句
+            <button class="speak-btn small" id="btn-speak-ex" title="例句发音" aria-label="例句发音"><svg><use href="#i-sound"/></svg></button>
+          </div>
+          <div class="example" id="word-example"></div>
+          <div class="example-zh" id="word-example-zh"></div>
+        </div>
       </div>
-      <div class="phonetic" id="word-ph2"></div>
-      <div class="def" id="word-def"></div>
-      <div class="divider"></div>
-      <div class="section-label">词根词缀</div>
-      <div class="root-line" id="word-root"></div>
-      <div class="section-label ex-label">情景例句
-        <button class="speak-btn small" id="btn-speak-ex" title="例句发音">🔊</button>
-      </div>
-      <div class="example" id="word-example"></div>
-      <div class="example-zh" id="word-example-zh"></div>
     </div>
   </main>
 
   <footer class="answer-bar" id="answer-bar">
-    <button class="ans-btn ans-forgot" id="btn-forgot">忘了</button>
-    <button class="ans-btn ans-fuzzy" id="btn-fuzzy">模糊</button>
-    <button class="ans-btn ans-know" id="btn-know">认识</button>
+    <button class="ans-btn ans-forgot" id="btn-forgot"><span>忘了</span><kbd>1</kbd></button>
+    <button class="ans-btn ans-fuzzy" id="btn-fuzzy"><span>模糊</span><kbd>2</kbd></button>
+    <button class="ans-btn ans-know" id="btn-know"><span>认识</span><kbd>3</kbd></button>
   </footer>
   <footer class="reveal-bar" id="reveal-bar">
-    <button class="reveal-btn" id="btn-reveal">显示释义</button>
+    <button class="reveal-btn" id="btn-reveal"><span>显示释义</span><kbd>Space</kbd></button>
+  </footer>
+</div>
+
+<!-- ============ 拼写 ============ -->
+<div id="scr-spell" class="screen">
+  <header class="topbar">
+    <button class="icon-btn" id="btn-spell-exit" title="退出 (Esc)" aria-label="退出"><svg><use href="#i-close"/></svg></button>
+    <div class="study-progress" id="spell-progress">0 / 0</div>
+    <div class="study-type">拼写</div>
+  </header>
+  <div class="progressbar"><div class="progressbar-fill" id="spell-bar"></div></div>
+
+  <main class="study-main">
+    <div class="paper">
+      <div class="spell-card" id="spell-card">
+        <div class="sp-def" id="sp-def"></div>
+        <div class="phon-line">
+          <span class="phonetic" id="sp-ph"></span>
+          <button class="speak-btn" id="btn-spell-speak" title="重听发音 (↑)" aria-label="发音"><svg><use href="#i-sound"/></svg></button>
+        </div>
+        <div class="sp-cloze" id="sp-cloze"></div>
+        <div class="sp-mask" id="sp-mask"></div>
+        <div class="sp-len" id="sp-len"></div>
+        <input class="sp-input" id="sp-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="输入单词" aria-label="拼写输入">
+        <div class="sp-feedback" id="sp-feedback"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="spell-bar show">
+    <button class="sp-btn" id="btn-spell-hint">提示</button>
+    <button class="sp-btn main" id="btn-spell-check"><span id="spell-check-text">确认</span><kbd>Enter</kbd></button>
   </footer>
 </div>
 
 <!-- ============ 设置 ============ -->
 <div id="scr-settings" class="screen">
   <header class="topbar">
-    <button class="icon-btn" data-nav="home" title="返回">←</button>
-    <div class="brand">设置</div>
-    <div class="topbar-actions"></div>
+    <button class="icon-btn" data-nav="home" title="返回" aria-label="返回"><svg><use href="#i-back"/></svg></button>
+    <div class="page-title">设置</div>
+    <div class="topbar-spacer"></div>
   </header>
   <main class="settings-main">
-    <div class="setting-row">
-      <div class="setting-label">每日新词</div>
-      <div class="stepper">
-        <button class="step-btn" data-step="-5">−</button>
-        <span class="step-val" id="set-daily">20</span>
-        <button class="step-btn" data-step="5">＋</button>
+    <div class="group-title">学习计划</div>
+    <div class="group">
+      <div class="setting-row">
+        <div class="setting-label">每日新词<span class="sub">建议 20–40 个</span></div>
+        <div class="stepper">
+          <button class="step-btn" data-step="-5" aria-label="减少">−</button>
+          <span class="step-val" id="set-daily">20</span>
+          <button class="step-btn" data-step="5" aria-label="增加">+</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">学习范围<span class="sub">重点词按真题词频排序</span></div>
+        <div class="seg">
+          <button class="seg-btn" data-scope="key">仅重点词</button>
+          <button class="seg-btn" data-scope="all">全部词汇</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">包含初中基础词<span class="sub">the、apple 这类过简单的词</span></div>
+        <button class="toggle" id="set-basic" aria-label="包含初中基础词"></button>
       </div>
     </div>
-    <div class="setting-row">
-      <div class="setting-label">学习范围</div>
-      <div class="seg">
-        <button class="seg-btn" data-scope="key">重点词优先</button>
-        <button class="seg-btn" data-scope="all">全部词汇</button>
+
+    <div class="group-title">发音</div>
+    <div class="group">
+      <div class="setting-row">
+        <div class="setting-label">显示单词时自动发音<span class="sub">美音朗读单词</span></div>
+        <button class="toggle" id="set-autospeak" aria-label="自动发音"></button>
       </div>
+      <button class="list-btn" id="btn-voice-test">测试发音（美音）</button>
     </div>
-    <div class="setting-row">
-      <div class="setting-label">包含初中基础词<br><span class="sub">the、apple 这类过简单的词</span></div>
-      <button class="toggle" id="set-basic"></button>
+
+    <div class="group-title">数据</div>
+    <div class="group">
+      <button class="list-btn" id="btn-export">导出学习记录</button>
+      <button class="list-btn" id="btn-import">导入学习记录</button>
+      <button class="list-btn danger" id="btn-reset">清空学习记录</button>
     </div>
-    <div class="setting-row">
-      <div class="setting-label">显示单词时自动发音<br><span class="sub">美音朗读单词</span></div>
-      <button class="toggle" id="set-autospeak"></button>
-    </div>
-    <div class="setting-divider"></div>
-    <button class="wide-btn" id="btn-voice-test">测试发音(美音)</button>
-    <button class="wide-btn" id="btn-export">导出学习记录</button>
-    <button class="wide-btn" id="btn-import">导入学习记录</button>
-    <button class="wide-btn danger" id="btn-reset">清空学习记录</button>
-    <input type="file" id="import-file" accept=".json" hidden>
+    <input type="file" id="import-file" accept=".json,application/json" hidden>
+    <p class="foot-note">学习记录仅保存在本机浏览器中，更换设备前请先导出。</p>
   </main>
 </div>
 
 <!-- ============ 统计 ============ -->
 <div id="scr-stats" class="screen">
   <header class="topbar">
-    <button class="icon-btn" data-nav="home" title="返回">←</button>
-    <div class="brand">统计</div>
-    <div class="topbar-actions"></div>
+    <button class="icon-btn" data-nav="home" title="返回" aria-label="返回"><svg><use href="#i-back"/></svg></button>
+    <div class="page-title">统计</div>
+    <div class="topbar-spacer"></div>
   </header>
   <main class="stats-main">
     <div class="stat-grid">
       <div class="stat-cell"><div class="stat-num" id="st-learned">0</div><div class="stat-label">已学</div></div>
       <div class="stat-cell"><div class="stat-num" id="st-reviewing">0</div><div class="stat-label">复习中</div></div>
       <div class="stat-cell"><div class="stat-num" id="st-mastered">0</div><div class="stat-label">已掌握</div></div>
-    </div>
-    <div class="stat-grid">
       <div class="stat-cell"><div class="stat-num" id="st-streak">0</div><div class="stat-label">连续天数</div></div>
       <div class="stat-cell"><div class="stat-num" id="st-total">0</div><div class="stat-label">词库总量</div></div>
       <div class="stat-cell"><div class="stat-num" id="st-today">0</div><div class="stat-label">今日已学</div></div>
     </div>
-    <div class="vocab-breakdown" id="st-breakdown"></div>
-    <div class="search-box">
-      <input type="text" id="search-input" placeholder="查词（输入英文）">
-      <div class="search-result" id="search-result"></div>
+
+    <div class="group-title">拼写</div>
+    <div class="stat-grid">
+      <div class="stat-cell"><div class="stat-num" id="st-spell-total">0</div><div class="stat-label">拼写次数</div></div>
+      <div class="stat-cell"><div class="stat-num" id="st-spell-rate">—</div><div class="stat-label">正确率</div></div>
+      <div class="stat-cell"><div class="stat-num" id="st-spell-weak">0</div><div class="stat-label">待巩固</div></div>
     </div>
+
+    <div class="group-title">词库构成</div>
+    <div class="vocab-breakdown" id="st-breakdown"></div>
+
+    <div class="group-title">查词</div>
+    <div class="search-box">
+      <svg class="search-ico"><use href="#i-search"/></svg>
+      <input type="text" id="search-input" placeholder="输入英文或中文释义" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="search-result" id="search-result"></div>
   </main>
 </div>
 
